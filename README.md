@@ -5,7 +5,7 @@ Ansible project for Linux server management: inventory definition and automation
 ## Requirements
 
 - Ansible installed on the control node: `pip install ansible`
-- SSH access to managed hosts (user `waiyan`, sudo for escalated plays)
+- SSH access to managed hosts (user `ansible`, sudo for escalated plays)
 - Python + pyyaml on the control node for local YAML validation
 
 ## Repository layout
