@@ -11,6 +11,7 @@ Ansible project for Linux server management. Two playable surfaces: `inventory/`
 ## Structure & conventions
 
 - Inventory: `inventory/hosts.yml` (YAML format, not `inventory/hosts`). Groups available: `webservers`, `dbservers`, `monitoring` (children of `production`), plus `staging`. `all` group sets `ansible_connection: ssh`.
-- Playbooks live in `playbooks/` and target inventory groups (e.g. `nginx-upgrade.yml` → hosts `webservers`).
+- Playbooks live in `playbooks/` and target inventory groups: `nginx-upgrade.yml` → `webservers`, `mysql-setup.yml` → `dbservers`.
 - Existing code uses fully-qualified module names (`ansible.builtin.*`), `register` + `failed_when`/`changed_when` on ad-hoc commands, and version info captured via `nginx -v` parsed with `regex_search('nginx/[\\d.]+')`. Follow this style for new playbooks.
+- `mysql-setup.yml` is the one exception to the `ansible.builtin.*`-only rule: it uses `community.mysql.mysql_user` / `mysql_db`, which require `ansible-galaxy collection install community.mysql` (not installed here). Hardcoded `ChangeMe_*` passwords in its `vars:` are placeholders.
 - Real commands to hand the user (do not attempt to run here): `ansible-playbook -i inventory/hosts.yml playbooks/<name>.yml`, `ansible-inventory -i inventory/hosts.yml --list`, `ansible all -m ping`.

@@ -1,0 +1,101 @@
+---
+- name: Install MySQL, harden root login, and provision application database/user
+  hosts: dbservers
+  become: true
+
+  vars:
+    mysql_database: myapp
+    mysql_app_user: myapp
+    mysql_app_password: ChangeMe_StrongPassword
+    mysql_root_password: ChangeMe_RootPassword
+    mysql_bind_address: 127.0.0.1
+
+  tasks:
+    - name: Set package and driver names by distro family
+      ansible.builtin.set_fact:
+        mysql_server_pkg: >-
+          {{ 'default-mysql-server' if ansible_facts.os_family == 'Debian' else 'mysql-server' }}
+        mysql_python_driver_pkg: >-
+          {{ 'python3-pymysql' if ansible_facts.os_family == 'Debian' else 'python3-PyMySQL' }}
+
+    - name: Update package index (apt-based)
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+      when: ansible_facts.os_family == 'Debian'
+
+    - name: Install MySQL server
+      ansible.builtin.package:
+        name: "{{ mysql_server_pkg }}"
+        state: present
+
+    - name: Install PyMySQL driver (required by mysql_* modules)
+      ansible.builtin.package:
+        name: "{{ mysql_python_driver_pkg }}"
+        state: present
+
+    - name: Enable and start MySQL service
+      ansible.builtin.service:
+        name: mysql
+        state: started
+        enabled: true
+
+    - name: Wait for MySQL to accept connections
+      ansible.builtin.wait_for:
+        port: 3306
+        host: "{{ mysql_bind_address }}"
+        timeout: 30
+
+    - name: Remove anonymous users
+      community.mysql.mysql_user:
+        name: ''
+        host_all: true
+        state: absent
+
+    - name: Remove remote root accounts (disallow root login over TCP)
+      community.mysql.mysql_user:
+        name: root
+        host: '%'
+        state: absent
+
+    - name: Remove test database
+      community.mysql.mysql_db:
+        name: test
+        state: absent
+
+    - name: Create application database
+      community.mysql.mysql_db:
+        name: "{{ mysql_database }}"
+        state: present
+
+    - name: Create application user with privileges on its database
+      community.mysql.mysql_user:
+        name: "{{ mysql_app_user }}"
+        host: localhost
+        password: "{{ mysql_app_password }}"
+        priv: "{{ mysql_database }}.*:ALL"
+        state: present
+
+    - name: Set root password (RHEL-family default allows socket auth, Debian uses auth_socket)
+      community.mysql.mysql_user:
+        name: root
+        host: localhost
+        password: "{{ mysql_root_password }}"
+        state: present
+      when: ansible_facts.os_family != 'Debian'
+
+    - name: Show secure login status per distro family
+      ansible.builtin.debug:
+        msg: >-
+          {{ 'root login protected by auth_socket — use "sudo mysql" as admin; no network root access'
+             if ansible_facts.os_family == 'Debian'
+             else 'root password set; remote root disabled' }}
+
+    - name: Display provisioning summary
+      ansible.builtin.debug:
+        msg: >-
+          Host: {{ inventory_hostname }} |
+          DB: {{ mysql_database }} |
+          App user: {{ mysql_app_user }}@localhost |
+          Service: mysql (enabled) |
+          Bind: {{ mysql_bind_address }}

@@ -15,8 +15,12 @@ Ansible project for Linux server management: inventory definition and automation
 ├── inventory/
 │   └── hosts.yml            # static inventory (webservers, dbservers, monitoring, staging)
 └── playbooks/
-    └── nginx-upgrade.yml    # upgrade nginx, backup config, verify, reload
+    ├── nginx-upgrade.yml    # upgrade nginx, backup config, verify, reload
+    └── mysql-setup.yml      # install MySQL, secure root login, create db + user
 ```
+
+> `mysql-setup.yml` requires the `community.mysql` collection:
+> `ansible-galaxy collection install community.mysql`
 
 ## Quick start
 
@@ -48,6 +52,12 @@ Groups in `inventory/hosts.yml`:
 
 All entries are placeholders — replace `ansible_host` / `ansible_user` with real values before use.
 
+## Collection
+
+```bash
+ansible-galaxy collection install community.mysql
+```
+
 ## Playbooks
 
 ### `nginx-upgrade.yml`
@@ -63,6 +73,23 @@ Upgrades nginx to the latest package on all `webservers`:
 Run: `ansible-playbook -i inventory/hosts.yml playbooks/nginx-upgrade.yml`
 
 > Note: `ansible.cfg` enables `become = True` globally, so playbooks escalate to root unless they opt out with `become: false`.
+
+### `mysql-setup.yml`
+
+Installs MySQL, removes insecure defaults, and provisions an application database/user on all `dbservers`:
+
+1. Installs MySQL server + PyMySQL driver (`default-mysql-server`/`python3-pymysql` on Debian, `mysql-server`/`python3-PyMySQL` on RHEL)
+2. Enables and starts the `mysql` service
+3. Removes anonymous users, remote `root@%` accounts, and the `test` database
+4. Creates the application database and a dedicated app user (`%APP_USER%@localhost`) with full privileges on it
+5. Sets the root password on RHEL; on Debian root keeps `auth_socket` (admin shell login via `sudo mysql`)
+
+Configure passwords and the database name in `vars` (use `ansible-vault` for real secrets):
+
+```bash
+ansible-galaxy collection install community.mysql   # once
+ansible-playbook -i inventory/hosts.yml playbooks/mysql-setup.yml
+```
 
 ## Upgrade workflow
 
